@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8" />
+<title>Gantt anual cu subtasks și perioade multiple</title>
+
+<style>
+  :root{
+    --name-col-width: 220px;
+    --year-col-width: 60px;
+    --row-height: 42px;
+    --bar-height: 30px;
+    --border-color: #d8d8d8;
+    --accent-color: #1f5f8b;
+    --gantt-font-size: 14px;
+    --gantt-subtask-font-size: 13px;
+    --swatch-size: 18px;
+  }
+  
+  .form-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .project-entry-row {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+  }
+  
+  .form-row .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  
+  .form-row .field.inline {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .form-row .field label {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  
+  .small-input {
+    width: 110px;
+  }
+
+  .project-title-inline {
+    font-weight: 700;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    font-size: 13px;
+  }
+
+  .copyright-line {
+    margin: 4px 0 10px;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .inline-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    font-size: 13px;
+  }
+
+  .project-name-input {
+    width: 205px;
+  }
+
+  .project-periods-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13px;
+  }
+
+  .periods-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+  }
+  
+  .subtasks-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .subtask-row {
+    background:#fff;
+    border:1px solid var(--border-color);
+    padding:8px 10px;
+    border-radius:8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+
+  .subtask-title {
+    font-weight: 600;
+    min-width: 120px;
+    font-size: 13px;
+  }
+
+  .subtask-color {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .subtask-periods {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex: 1 1 320px;
+    min-width: 220px;
+  }
+
+  .period-row {
+    margin-bottom: 0;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .period-row input {
+    width: 84px;
+    padding: 5px 6px;
+    margin-right: 4px;
+  }
+
+  .period-row button {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  .form-box input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+
+  body {
+    font-family: system-ui, sans-serif;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  h1 { margin: 0; font-size: 18px; }
+
+  button,
+  input,
+  label {
+    font: inherit;
+  }
+
+  .gantt-container {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    padding: 10px;
+    overflow: auto;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  /* Make grid borders align precisely */
+  .gantt-container *,
+  .gantt-grid *,
+  .gantt-header-year,
+  .gantt-separator-name,
+  .gantt-cell {
+    box-sizing: border-box;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0;
+    align-items: flex-start;
+    font-size: 13px;
+  }
+
+  .toolbar-inline-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: #fff;
+  }
+
+  .toolbar-inline-group label {
+    white-space: nowrap;
+  }
+
+  .toolbar-inline-group input {
+    accent-color: var(--accent-color);
+  }
+
+  .toolbar button,
+  .toolbar select,
+  .form-box button,
+  .file-label {
+    border: 1px solid var(--accent-color);
+    background: #fff;
+    color: var(--accent-color);
+    border-radius: 999px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .toolbar select {
+    appearance: none;
+    padding-right: 34px;
+  }
+
+  .toolbar select[multiple] {
+    min-width: 170px;
+    min-height: 92px;
+    padding-right: 12px;
+    border-radius: 12px;
+  }
+
+  .filter-group {
+    display: inline-flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .toolbar button,
+  .toolbar .file-label,
+  .toolbar .filter-group {
+    align-self: flex-start;
+  }
+
+  .toolbar button.primary,
+  .form-box button.primary {
+    background: var(--accent-color);
+    color: #fff;
+  }
+
+  .toolbar button.danger {
+    border-color: #b23a48;
+    color: #b23a48;
+  }
+
+  .file-label {
+    position: relative;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .file-label input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .actions-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .actions-row.inline-actions {
+    margin-top: 0;
+    align-self: center;
+    flex: 0 0 auto;
+  }
+
+  .swatch {
+    width: var(--swatch-size);
+    height: var(--swatch-size);
+    border-radius: calc(var(--swatch-size) / 2);
+    border: 1px solid rgba(0,0,0,0.15);
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+    background-color: currentColor;
+    box-shadow: inset 0 0 0 999px currentColor;
+    color: transparent;
+    flex: 0 0 var(--swatch-size);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .category-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .row-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .gantt-row-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .gantt-action-cell {
+    background: transparent;
+    border: 0;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: var(--row-height);
+    box-sizing: border-box;
+  }
+
+  .gantt-action-cell button {
+    padding: 4px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .gantt-header-action {
+    background: transparent;
+    border: 0;
+    min-height: var(--row-height);
+  }
+
+  .gantt-row-label-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .gantt-row-label-text span:last-child {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+
+  .gantt-empty {
+    padding: 18px;
+    color: #666;
+    background: #fff;
+    border-radius: 10px;
+  }
+
+  @media print {
+    body {
+      background: #fff;
+      padding: 0;
+      margin: 0;
+    }
+
+    h1,
+    .copyright-line,
+    .form-box,
+    .toolbar,
+    .no-print {
+      display: none !important;
+    }
+
+    .gantt-container {
+      border: 0;
+      padding: 0;
+      margin: 0;
+      overflow: visible;
+      box-shadow: none;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .form-row {
+      align-items: flex-start;
+    }
+
+    .project-entry-row {
+      flex-wrap: wrap;
+      overflow-x: visible;
+    }
+
+    .actions-row.inline-actions {
+      width: 100%;
+      align-self: stretch;
+    }
+
+    .project-name-input,
+    .project-periods-inline {
+      width: 100%;
+    }
+
+    .subtask-title,
+    .subtask-periods {
+      flex-basis: 100%;
+    }
+  }
+
+  .gantt-grid {
+    display: grid;
+    align-items: center;
+    font-size: var(--gantt-font-size);
+  }
+
+  .gantt-header-project,
+  .gantt-project-name,
+  .gantt-subtask-name {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    z-index: 5;
+    border-right: 1px solid #ccc;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    min-height: var(--row-height);
+    box-sizing: border-box;
+  }
+
+  .gantt-header-project {
+    justify-content: flex-end;
+    padding-right: 0;
+  }
+
+  .resize-handle {
+    width: 10px;
+    height: 100%;
+    cursor: col-resize;
+    position: relative;
+    flex: 0 0 auto;
+    touch-action: none;
+  }
+
+  .resize-handle::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 2px;
+    background: #b8c4cf;
+  }
+
+  /* 🔥 NIVEL 2 — 60px INDENTARE DOAR LA TEXT */
+  .gantt-subtask-name {
+    padding-left: 60px;
+    font-size: var(--gantt-subtask-font-size);
+    opacity: 0.85;
+  }
+
+  .gantt-header-year {
+    text-align: center;
+    font-weight: bold;
+    border-top: 1px solid #ccc;
+    border-right: 1px solid #ccc;
+    padding: 0 0 6px 0;
+    background: #fafafa;
+    min-height: var(--row-height);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .gantt-separator-name {
+    background: #fafafa;
+    border-right: 1px solid #ccc;
+    border-top: 1px solid #ccc;
+    min-height: var(--row-height);
+    padding-top: 0;
+  }
+
+  .gantt-cell {
+    border-right: 1px solid #ccc;
+    border-bottom: 1px solid #f0f0f0;
+    background: white;
+    min-height: var(--row-height);
+    position: relative;
+  }
+
+  .bar {
+    height: var(--bar-height);
+    border-radius: 8px;
+    border: 2px solid rgba(0,0,0,0.2);
+    align-self: center;
+    z-index: 10;
+    margin-left: 4px;
+    margin-right: 4px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ❌ Eliminat margin-left pentru subtasks (ca să înceapă la primul an) */
+</style>
+</head>
+
+<body>
+
+<div class="page-header">
+  <h1>Gantt anual cu subtasks</h1>
+  <div class="copyright-line">© goloplo</div>
+</div>
+
+<div class="form-box">
+  <div class="form-row project-entry-row">
+    <label class="inline-field" for="pname">
+      <span class="visually-hidden">Nume proiect</span>
+      <input id="pname" class="project-name-input" type="text" placeholder="Nume proiect" aria-label="Nume proiect">
+    </label>
+
+    <label class="inline-field" for="pcolor">
+      <span class="visually-hidden">Culoare proiect</span>
+      <input id="pcolor" type="color" value="#4caf50" aria-label="Culoare proiect">
+    </label>
+
+    <div class="project-periods-inline">
+      <div id="periods_project" class="periods-list"></div>
+      <button type="button" onclick="addPeriod('project')">Adaugă</button>
+    </div>
+
+    <div class="actions-row inline-actions">
+      <button id="submitBtn" class="primary" type="button" onclick="saveProject()">Adaugă</button>
+      <button id="cancelEditBtn" type="button" onclick="resetForm()" style="display:none;">Anulează editarea</button>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- SUBTASKS -->
+  <div id="subtasks_form" class="subtasks-compact"></div>
+</div>
+
+<div class="toolbar no-print">
+  <button type="button" onclick="exportTableCsv()">Exportă CSV</button>
+  <button type="button" onclick="exportTableJpg()">Salvează JPG</button>
+  <button type="button" onclick="exportTableXls()">Salvează XLS</button>
+  <label class="file-label">
+    Încarcă CSV
+    <input id="csvInput" type="file" accept=".csv,text/csv" onchange="importTableCsv(event)">
+  </label>
+  <label class="filter-group" for="categoryFilter">
+    <span class="visually-hidden">Filtru categorie</span>
+    <select id="categoryFilter" multiple onchange="setCategoryFilterFromSelect()" aria-label="Filtru categorie">
+      <option value="all">Toate</option>
+    </select>
+  </label>
+  <button type="button" onclick="printTable()">Printează tabelul</button>
+  <button type="button" class="danger" onclick="clearProjects()">Șterge tot</button>
+  <div class="toolbar-inline-group">
+    <label for="nameColumnWidth">Coloană nume</label>
+    <input id="nameColumnWidth" type="range" min="220" max="700" step="10" value="320" oninput="setNameColumnWidth(this.value)">
+  </div>
+  <div class="toolbar-inline-group">
+    <label for="yearColumnWidth">Lățime coloană ani</label>
+    <input id="yearColumnWidth" type="range" min="40" max="140" step="2" value="60" oninput="setYearColumnWidth(this.value)">
+    <span id="yearColumnWidthLabel" style="min-width:36px; text-align:right; font-size:13px;">60</span>
+  </div>
+  <div class="toolbar-inline-group">
+    <label for="nameFontSize">Text proiect</label>
+    <input id="nameFontSize" type="range" min="11" max="22" step="1" value="14" oninput="setFontSize(this.value)">
+  </div>
+  <div class="toolbar-inline-group">
+    <label for="programColor">Culoare program</label>
+    <input id="programColor" type="color" value="#1f5f8b" onchange="setProgramColor(this.value)">
+  </div>
+  <div class="toolbar-inline-group">
+    <label for="subtaskFontSize">Text categorie</label>
+    <input id="subtaskFontSize" type="range" min="10" max="20" step="1" value="13" oninput="setSubtaskFontSize(this.value)">
+  </div>
+  <div class="toolbar-inline-group">
+    <label for="barHeight">Înălțime bară</label>
+    <input id="barHeight" type="range" min="8" max="60" step="1" value="30" oninput="setBarHeight(this.value)">
+    <span id="barHeightLabel" style="min-width:30px; text-align:right; font-size:13px;">30</span>
+  </div>
+  <div class="toolbar-inline-group">
+    <label for="rowHeight">Înălțime rând</label>
+    <input id="rowHeight" type="range" min="28" max="80" step="1" value="42" oninput="setRowHeight(this.value)">
+    <span id="rowHeightLabel" style="min-width:30px; text-align:right; font-size:13px;">42</span>
+  </div>
+  <div class="toolbar-inline-group">
+    <label for="swatchSize">Diametru bulină</label>
+    <input id="swatchSize" type="range" min="8" max="36" step="1" value="18" oninput="setSwatchSize(this.value)">
+    <span id="swatchSizeLabel" style="min-width:30px; text-align:right; font-size:13px;">18</span>
+  </div>
+  <div class="toolbar-inline-group">
+    <span>Bară program</span>
+    <label><input id="showProgramBars" type="radio" name="programBarVisibility" value="show" onchange="setProgramBarVisibility(this.value)"> Da</label>
+    <label><input id="hideProgramBars" type="radio" name="programBarVisibility" value="hide" onchange="setProgramBarVisibility(this.value)"> Nu</label>
+  </div>
+  <button type="button" onclick="resetDisplaySettings()">Reset afișare</button>
+</div>
+
+<div class="gantt-container">
+  <div id="gantt" class="gantt-grid"></div>
+</div>
+
+<script>
+  const STORAGE_KEY = "gantt-projects-state";
+  const DISPLAY_DEFAULTS = {
+    nameColumnWidth: 320,
+    fontSize: 14,
+    subtaskFontSize: 13,
+    showProgramBars: true,
+    barHeight: 30,
+    rowHeight: 42,
+    swatchSize: 18,
+    yearColWidth: 60,
+    programColor: '#1f5f8b'
+  };
+  const CATEGORIES = [
+    { id: "digitalizare", label: "Digitalizare", color: "#2d6a9f" },
+    { id: "conservare", label: "Conservare", color: "#7a9e3d" },
+    { id: "cercetare", label: "Cercetare", color: "#bc6c25" },
+    { id: "conectare", label: "Conectare", color: "#8d5a97" },
+    { id: "parteneriat", label: "Parteneriat", color: "#c75146" }
+  ];
+
+  let projects = [];
+  let editingProjectIndex = null;
+  let categoryDefaults = getDefaultCategoryColors();
+  let selectedCategoryFilter = ["all"];
+  let displaySettings = { ...DISPLAY_DEFAULTS };
+  let isResizingNameColumn = false;
+
+  function getDefaultCategoryColors() {
+    return Object.fromEntries(CATEGORIES.map(category => [category.id, category.color]));
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function applyDisplaySettings() {
+    document.documentElement.style.setProperty("--name-col-width", `${displaySettings.nameColumnWidth}px`);
+    document.documentElement.style.setProperty("--gantt-font-size", `${displaySettings.fontSize}px`);
+    document.documentElement.style.setProperty("--gantt-subtask-font-size", `${displaySettings.subtaskFontSize}px`);
+    document.documentElement.style.setProperty("--bar-height", `${displaySettings.barHeight}px`);
+    document.documentElement.style.setProperty("--row-height", `${displaySettings.rowHeight}px`);
+    document.documentElement.style.setProperty("--swatch-size", `${displaySettings.swatchSize}px`);
+    document.documentElement.style.setProperty("--year-col-width", `${displaySettings.yearColWidth}px`);
+    document.documentElement.style.setProperty("--program-color", `${displaySettings.programColor}`);
+
+    const widthInput = document.getElementById("nameColumnWidth");
+    const fontSizeInput = document.getElementById("nameFontSize");
+    const subtaskFontSizeInput = document.getElementById("subtaskFontSize");
+    const barHeightInput = document.getElementById("barHeight");
+    const rowHeightInput = document.getElementById("rowHeight");
+    const swatchSizeInput = document.getElementById("swatchSize");
+    const yearColWidthInput = document.getElementById("yearColumnWidth");
+    const showProgramBarsInput = document.getElementById("showProgramBars");
+    const hideProgramBarsInput = document.getElementById("hideProgramBars");
+
+    if (widthInput) widthInput.value = displaySettings.nameColumnWidth;
+    if (fontSizeInput) fontSizeInput.value = displaySettings.fontSize;
+    if (subtaskFontSizeInput) subtaskFontSizeInput.value = displaySettings.subtaskFontSize;
+    if (barHeightInput) barHeightInput.value = displaySettings.barHeight;
+    if (rowHeightInput) rowHeightInput.value = displaySettings.rowHeight;
+    if (swatchSizeInput) swatchSizeInput.value = displaySettings.swatchSize;
+    if (yearColWidthInput) yearColWidthInput.value = displaySettings.yearColWidth;
+    const programColorInput = document.getElementById('programColor');
+    if (programColorInput) programColorInput.value = displaySettings.programColor;
+    const barLabel = document.getElementById('barHeightLabel');
+    const rowLabel = document.getElementById('rowHeightLabel');
+    const swatchLabel = document.getElementById('swatchSizeLabel');
+    if (barLabel) barLabel.textContent = String(displaySettings.barHeight);
+    if (rowLabel) rowLabel.textContent = String(displaySettings.rowHeight);
+    if (swatchLabel) swatchLabel.textContent = String(displaySettings.swatchSize);
+    const yearLabel = document.getElementById('yearColumnWidthLabel');
+    if (yearLabel) yearLabel.textContent = String(displaySettings.yearColWidth);
+    if (showProgramBarsInput) showProgramBarsInput.checked = !!displaySettings.showProgramBars;
+    if (hideProgramBarsInput) hideProgramBarsInput.checked = !displaySettings.showProgramBars;
+  }
+
+  function setNameColumnWidth(value, persist = true) {
+    displaySettings.nameColumnWidth = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.nameColumnWidth, 220, 700);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setFontSize(value, persist = true) {
+    displaySettings.fontSize = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.fontSize, 11, 22);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setSubtaskFontSize(value, persist = true) {
+    displaySettings.subtaskFontSize = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.subtaskFontSize, 10, 20);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setYearColumnWidth(value, persist = true) {
+    displaySettings.yearColWidth = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.yearColWidth, 40, 140);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setProgramColor(value, persist = true) {
+    displaySettings.programColor = value || DISPLAY_DEFAULTS.programColor;
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setBarHeight(value, persist = true) {
+    displaySettings.barHeight = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.barHeight, 8, 60);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setRowHeight(value, persist = true) {
+    displaySettings.rowHeight = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.rowHeight, 28, 80);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setSwatchSize(value, persist = true) {
+    displaySettings.swatchSize = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.swatchSize, 8, 36);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setRowHeight(value, persist = true) {
+    displaySettings.rowHeight = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.rowHeight, 28, 80);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function setSwatchSize(value, persist = true) {
+    displaySettings.swatchSize = clamp(parseInt(value, 10) || DISPLAY_DEFAULTS.swatchSize, 8, 36);
+    applyDisplaySettings();
+    renderAll();
+    if (persist) persistState();
+  }
+
+  function resetDisplaySettings() {
+    displaySettings = { ...DISPLAY_DEFAULTS };
+    applyDisplaySettings();
+    renderAll();
+    persistState();
+  }
+
+  function setProgramBarVisibility(value) {
+    displaySettings.showProgramBars = value === "show";
+    applyDisplaySettings();
+    renderAll();
+    persistState();
+  }
+
+  function startNameColumnResize(event) {
+    isResizingNameColumn = true;
+    event.preventDefault();
+  }
+
+  function handleNameColumnResize(event) {
+    if (!isResizingNameColumn) return;
+
+    const container = document.querySelector(".gantt-container");
+    if (!container) return;
+
+    const bounds = container.getBoundingClientRect();
+    const nextWidth = clamp(Math.round(event.clientX - bounds.left), 220, 700);
+    setNameColumnWidth(nextWidth, false);
+  }
+
+  function stopNameColumnResize() {
+    if (!isResizingNameColumn) return;
+    isResizingNameColumn = false;
+    persistState();
+  }
+
+  document.addEventListener("pointermove", handleNameColumnResize);
+  document.addEventListener("pointerup", stopNameColumnResize);
+
+  function populateCategoryFilter() {
+    const select = document.getElementById("categoryFilter");
+    select.innerHTML = '<option value="all">Toate</option><option value="programs">Programe</option>' + CATEGORIES.map(category => `
+      <option value="${category.id}">${category.label}</option>
+    `).join("");
+
+    const selectedValues = Array.isArray(selectedCategoryFilter) && selectedCategoryFilter.length > 0
+      ? selectedCategoryFilter
+      : ["all"];
+
+    [...select.options].forEach(option => {
+      option.selected = selectedValues.includes(option.value);
+    });
+  }
+
+  function getActiveCategoryFilters() {
+    if (!Array.isArray(selectedCategoryFilter) || selectedCategoryFilter.length === 0 || selectedCategoryFilter.includes("all")) {
+      return ["programs", ...CATEGORIES.map(category => category.id)];
+    }
+
+    return selectedCategoryFilter;
+  }
+
+  function initForm() {
+    document.getElementById("periods_project").innerHTML = "";
+    addPeriod("project");
+
+    const container = document.getElementById("subtasks_form");
+    container.innerHTML = "";
+
+    CATEGORIES.forEach(category => {
+      const id = category.id;
+      container.innerHTML += `
+        <div class="subtask-row">
+          <div class="subtask-title">${category.label}</div>
+          <div class="subtask-color">
+            <label class="visually-hidden" for="color_${id}">Culoare ${category.label}</label>
+            <input id="color_${id}" type="color" value="${categoryDefaults[id]}" aria-label="Culoare ${category.label}">
+          </div>
+          <div id="periods_${id}" class="subtask-periods"></div>
+          <div><button type="button" onclick="addPeriod('${id}')">Adaugă</button></div>
+        </div>
+      `;
+
+      addPeriod(id);
+    });
+
+    updateFormActions();
+  }
+
+  initForm();
+  populateCategoryFilter();
+  applyDisplaySettings();
+  loadStoredState();
+
+  function addPeriod(target, start = "", end = "") {
+    const div = document.createElement("div");
+    div.className = "period-row";
+
+    div.innerHTML = `
+      <input type="number" class="start" placeholder="An start" value="${start}">
+      <input type="number" class="end" placeholder="An sfârșit" value="${end}">
+      <button type="button" onclick="this.parentElement.remove()">x</button>
+    `;
+
+    document.getElementById("periods_" + target).appendChild(div);
+  }
+
+  function saveProject() {
+    const name = document.getElementById("pname").value.trim();
+    const color = document.getElementById("pcolor").value;
+
+    if (!name) return alert("Introduceți numele proiectului.");
+
+    const projectPeriods = readPeriods("project");
+
+    const subtasks = {};
+    CATEGORIES.forEach(category => {
+      const id = category.id;
+      categoryDefaults[id] = document.getElementById("color_" + id).value;
+      subtasks[id] = {
+        color: document.getElementById("color_" + id).value,
+        periods: readPeriods(id)
+      };
+    });
+
+    const projectRecord = {
+      name,
+      color,
+      periods: projectPeriods,
+      subtasks
+    };
+
+    if (editingProjectIndex === null) {
+      projects.push(projectRecord);
+    } else {
+      projects[editingProjectIndex] = projectRecord;
+    }
+
+    persistState();
+    resetForm();
+    renderAll();
+  }
+
+  function resetForm() {
+    editingProjectIndex = null;
+    document.getElementById("pname").value = "";
+    document.getElementById("pcolor").value = "#4caf50";
+    document.getElementById("periods_project").innerHTML = "";
+    initForm();
+  }
+
+  function updateFormActions() {
+    const submitBtn = document.getElementById("submitBtn");
+    const cancelBtn = document.getElementById("cancelEditBtn");
+    const isEditing = editingProjectIndex !== null;
+
+    submitBtn.textContent = isEditing ? "Salvează" : "Adaugă";
+    cancelBtn.style.display = isEditing ? "inline-flex" : "none";
+  }
+
+  function editProject(index) {
+    const project = projects[index];
+    if (!project) return;
+
+    editingProjectIndex = index;
+    document.getElementById("pname").value = project.name;
+    document.getElementById("pcolor").value = project.color;
+
+    setPeriods("project", project.periods);
+
+    CATEGORIES.forEach(category => {
+      const subtask = project.subtasks[category.id] || { color: categoryDefaults[category.id], periods: [] };
+      document.getElementById("color_" + category.id).value = subtask.color;
+      setPeriods(category.id, subtask.periods);
+    });
+
+    updateFormActions();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function setPeriods(target, periods) {
+    const container = document.getElementById("periods_" + target);
+    container.innerHTML = "";
+
+    if (periods.length === 0) {
+      addPeriod(target);
+      return;
+    }
+
+    periods.forEach(period => addPeriod(target, period.start, period.end));
+  }
+
+  function readPeriods(target) {
+    const rows = [...document.querySelectorAll("#periods_" + target + " .period-row")];
+    const list = [];
+
+    for (const row of rows) {
+      const start = parseInt(row.querySelector(".start").value);
+      const end = parseInt(row.querySelector(".end").value);
+      if (!isNaN(start) && !isNaN(end) && end >= start) {
+        list.push({ start, end });
+      }
+    }
+    return list;
+  }
+
+  function renderAll() {
+    renderGantt();
+  }
+
+  function buildVisibleTableModel() {
+    if (projects.length === 0) {
+      return { years: [], rows: [] };
+    }
+
+    let minYear = Infinity;
+    let maxYear = -Infinity;
+
+    projects.forEach(project => {
+      project.periods.forEach(period => {
+        if (period.start < minYear) minYear = period.start;
+        if (period.end > maxYear) maxYear = period.end;
+      });
+
+      CATEGORIES.forEach(category => {
+        project.subtasks[category.id].periods.forEach(period => {
+          if (period.start < minYear) minYear = period.start;
+          if (period.end > maxYear) maxYear = period.end;
+        });
+      });
+    });
+
+    if (minYear === Infinity || maxYear === -Infinity) {
+      const currentYear = new Date().getFullYear();
+      minYear = currentYear;
+      maxYear = currentYear;
+    }
+
+    const years = [];
+    for (let year = minYear; year <= maxYear; year++) years.push(year);
+
+    const activeFilters = getActiveCategoryFilters();
+    const visibleCategoryIds = CATEGORIES
+      .map(category => category.id)
+      .filter(categoryId => activeFilters.includes(categoryId));
+    const showProgramRows = activeFilters.includes("programs") || visibleCategoryIds.length > 0;
+    const rows = [];
+
+    projects.forEach((project, projectIndex) => {
+      if (showProgramRows) {
+        rows.push({
+          label: project.name,
+          color: project.color,
+          periods: project.periods,
+          isSubtask: false,
+          projectIndex
+        });
+      }
+
+      CATEGORIES.forEach(category => {
+        if (!visibleCategoryIds.includes(category.id)) return;
+
+        rows.push({
+          label: category.label,
+          color: project.subtasks[category.id].color,
+          periods: project.subtasks[category.id].periods,
+          isSubtask: true,
+          projectIndex
+        });
+      });
+    });
+
+    return { years, rows };
+  }
+
+  function renderGantt() {
+    const ganttEl = document.getElementById("gantt");
+    ganttEl.innerHTML = "";
+
+    if (projects.length === 0) {
+      ganttEl.innerHTML = '<div class="gantt-empty">Nu există proiecte salvate. Adăugați un proiect sau încărcați un fișier CSV.</div>';
+      ganttEl.style.gridTemplateColumns = "1fr";
+      return;
+    }
+
+    const { years, rows } = buildVisibleTableModel();
+
+    const colWidth = displaySettings.yearColWidth || 60;
+    const nameCol = displaySettings.nameColumnWidth;
+    const actionCol = 96;
+    const effectiveRowHeight = displaySettings.rowHeight;
+
+    ganttEl.style.gridTemplateColumns =
+      `${nameCol}px ` + years.map(()=>`${colWidth}px`).join(" ") + ` ${actionCol}px`;
+    // set grid auto row size
+    ganttEl.style.gridAutoRows = `${effectiveRowHeight}px`;
+
+    // PROIECTE + SUBTASKS
+    let row = 1;
+
+    rows.forEach((tableRow, index) => {
+      const prevRow = rows[index - 1];
+      // If this is the first row or a new project block, insert the year/header separator first
+      if (!prevRow || prevRow.projectIndex !== tableRow.projectIndex) {
+        addYearSeparatorRow(row);
+        row++;
+      }
+
+      addRow(tableRow.label, tableRow.color, tableRow.periods, row, tableRow.isSubtask, tableRow.projectIndex);
+      row++;
+    });
+
+    function addRow(label, color, periods, rowNumber, isSubtask, projectIndex) {
+      const nameCell = document.createElement("div");
+      nameCell.className = isSubtask ? "gantt-subtask-name" : "gantt-project-name";
+      nameCell.style.gridColumn = "1";
+      nameCell.style.gridRow = rowNumber;
+
+      if (isSubtask) {
+        nameCell.innerHTML = `<span class="gantt-row-label-text"><span class="swatch" style="background-color:${color}; color:${color};"></span><span>${escapeHtml(label)}</span></span>`;
+      } else {
+        nameCell.innerHTML = `
+          <div class="gantt-row-label">
+            <span class="gantt-row-label-text"><span class="swatch" style="background-color:${color}; color:${color};"></span><span>${escapeHtml(label)}</span></span>
+          </div>
+        `;
+      }
+
+      ganttEl.appendChild(nameCell);
+
+      years.forEach((_, idx) => {
+        const cell = document.createElement("div");
+        cell.className = "gantt-cell";
+        cell.style.gridColumn = `${2 + idx}`;
+        cell.style.gridRow = rowNumber;
+        ganttEl.appendChild(cell);
+      });
+
+      const actionCell = document.createElement("div");
+      actionCell.className = "gantt-action-cell";
+      actionCell.style.gridColumn = `${2 + years.length}`;
+      actionCell.style.gridRow = rowNumber;
+      if (!isSubtask) {
+        actionCell.innerHTML = `<button type="button" class="no-print" onclick="editProject(${projectIndex})">Editează</button>`;
+      }
+      ganttEl.appendChild(actionCell);
+
+      const visiblePeriods = !isSubtask && !displaySettings.showProgramBars ? [] : periods;
+
+        visiblePeriods.forEach(period => {
+        const startIndex = years.indexOf(period.start);
+        const endIndex = years.indexOf(period.end);
+        if (startIndex === -1 || endIndex === -1) return;
+
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        const programColor = displaySettings.programColor || DISPLAY_DEFAULTS.programColor;
+        bar.style.background = isSubtask ? color : programColor;
+        bar.style.gridColumn = `${2 + startIndex} / ${3 + endIndex}`;
+        bar.style.gridRow = rowNumber;
+        bar.style.height = `${displaySettings.barHeight}px`;
+        ganttEl.appendChild(bar);
+      });
+    }
+
+    function addYearSeparatorRow(rowNumber) {
+      const nameCell = document.createElement("div");
+      nameCell.className = "gantt-header-project gantt-separator-name";
+      nameCell.innerHTML = '<div class="resize-handle" title="Trage pentru a modifica lățimea coloanei numelor"></div>';
+      nameCell.style.gridColumn = "1";
+      nameCell.style.gridRow = rowNumber;
+      ganttEl.appendChild(nameCell);
+
+      nameCell.querySelector(".resize-handle").addEventListener("pointerdown", startNameColumnResize);
+
+      years.forEach((year, idx) => {
+        const headerCell = document.createElement("div");
+        headerCell.className = "gantt-header-year";
+        headerCell.textContent = year;
+        headerCell.style.gridColumn = `${2 + idx}`;
+        headerCell.style.gridRow = rowNumber;
+        ganttEl.appendChild(headerCell);
+      });
+      const actionHeaderCell = document.createElement("div");
+      actionHeaderCell.className = "gantt-header-action";
+      actionHeaderCell.style.gridColumn = `${2 + years.length}`;
+      actionHeaderCell.style.gridRow = rowNumber;
+      ganttEl.appendChild(actionHeaderCell);
+    }
+  }
+
+  function serializePeriods(periods) {
+    if (!periods || periods.length === 0) return "";
+    return periods.map(period => `${period.start}-${period.end}`).join("|");
+  }
+
+  function deserializePeriods(value) {
+    if (!value) return [];
+
+    return value
+      .split(/\||;/)
+      .map(item => item.trim())
+      .filter(Boolean)
+      .map(item => item.split("-"))
+      .map(parts => ({ start: parseInt(parts[0], 10), end: parseInt(parts[1], 10) }))
+      .filter(period => !isNaN(period.start) && !isNaN(period.end) && period.end >= period.start);
+  }
+
+  function exportTableCsv() {
+    if (projects.length === 0) {
+      alert("Nu există date de exportat.");
+      return;
+    }
+
+    const headers = ["project_name", "project_color", "program_color", "project_periods"];
+    CATEGORIES.forEach(category => {
+      headers.push(`${category.id}_color`, `${category.id}_periods`);
+    });
+
+    const rows = projects.map(project => {
+      const row = [project.name, project.color, displaySettings.programColor || DISPLAY_DEFAULTS.programColor, serializePeriods(project.periods)];
+
+      CATEGORIES.forEach(category => {
+        const subtask = project.subtasks[category.id];
+        row.push(subtask.color, serializePeriods(subtask.periods));
+      });
+
+      return row;
+    });
+
+    const csv = [headers, ...rows]
+      .map(row => row.map(escapeCsv).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "gantt-projects.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importTableCsv(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const text = await file.text();
+    const rows = parseCsv(text);
+
+    if (rows.length < 2) {
+      alert("Fișierul CSV nu conține date importabile.");
+      event.target.value = "";
+      return;
+    }
+
+    const headers = rows[0].map(cell => cell.trim().toLowerCase());
+    const importedProjects = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row.some(cell => cell.trim() !== "")) continue;
+
+      const name = getCsvValue(headers, row, "project_name").trim();
+      if (!name) continue;
+
+      const project = {
+        name,
+        color: getCsvValue(headers, row, "project_color") || "#4caf50",
+        periods: deserializePeriods(getCsvValue(headers, row, "project_periods")),
+        subtasks: {}
+      };
+
+      // global program color from CSV (if provided) — use first non-empty value
+      const csvProgramColor = getCsvValue(headers, row, "program_color");
+      if (csvProgramColor && String(csvProgramColor).trim()) {
+        displaySettings.programColor = String(csvProgramColor).trim();
+        applyDisplaySettings();
+      }
+
+      CATEGORIES.forEach(category => {
+        const color = getCsvValue(headers, row, `${category.id}_color`) || categoryDefaults[category.id];
+        const periods = deserializePeriods(getCsvValue(headers, row, `${category.id}_periods`));
+
+        categoryDefaults[category.id] = color;
+        project.subtasks[category.id] = { color, periods };
+      });
+
+      importedProjects.push(project);
+    }
+
+    projects = importedProjects.map(normalizeProject);
+    // If CSV did not include a program_color column, default program color to first project's color
+    const hasProgramColorHeader = (headers.indexOf('program_color') !== -1);
+    if (!hasProgramColorHeader && projects.length > 0) {
+      displaySettings.programColor = projects[0].color || DISPLAY_DEFAULTS.programColor;
+      applyDisplaySettings();
+    }
+    persistState();
+    resetForm();
+    renderAll();
+    event.target.value = "";
+  }
+
+  function setCategoryFilterFromSelect() {
+    const select = document.getElementById("categoryFilter");
+    const values = [...select.selectedOptions].map(option => option.value);
+
+    if (values.length === 0 || values.includes("all")) {
+      selectedCategoryFilter = ["all"];
+    } else {
+      selectedCategoryFilter = values;
+    }
+
+    populateCategoryFilter();
+    persistState();
+    renderAll();
+  }
+
+  function normalizeProject(project) {
+    const normalized = {
+      name: project.name || "",
+      color: project.color || "#4caf50",
+      periods: Array.isArray(project.periods) ? project.periods : [],
+      subtasks: {}
+    };
+
+    CATEGORIES.forEach(category => {
+      const savedSubtask = project.subtasks?.[category.id] || {};
+      normalized.subtasks[category.id] = {
+        color: savedSubtask.color || categoryDefaults[category.id] || category.color,
+        periods: Array.isArray(savedSubtask.periods) ? savedSubtask.periods : []
+      };
+    });
+
+    return normalized;
+  }
+
+  function persistState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        projects,
+        categoryDefaults,
+        selectedCategoryFilter,
+        displaySettings
+      }));
+    } catch (error) {
+      console.error("Nu am putut salva starea Gantt.", error);
+    }
+  }
+
+  function loadStoredState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        renderAll();
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      categoryDefaults = {
+        ...getDefaultCategoryColors(),
+        ...(parsed.categoryDefaults || {})
+      };
+      displaySettings = {
+        ...DISPLAY_DEFAULTS,
+        ...(parsed.displaySettings || {})
+      };
+      selectedCategoryFilter = Array.isArray(parsed.selectedCategoryFilter)
+        ? parsed.selectedCategoryFilter
+        : (parsed.selectedCategoryFilter ? [parsed.selectedCategoryFilter] : ["all"]);
+      applyDisplaySettings();
+      populateCategoryFilter();
+      projects = Array.isArray(parsed.projects) ? parsed.projects.map(normalizeProject) : [];
+      resetForm();
+      renderAll();
+    } catch (error) {
+      console.error("Nu am putut încărca starea Gantt.", error);
+      categoryDefaults = getDefaultCategoryColors();
+      displaySettings = { ...DISPLAY_DEFAULTS };
+      selectedCategoryFilter = ["all"];
+      applyDisplaySettings();
+      populateCategoryFilter();
+      projects = [];
+      resetForm();
+      renderAll();
+    }
+  }
+
+  function clearProjects() {
+    if (!confirm("Ștergeți toate proiectele salvate și culorile personalizate?")) return;
+
+    projects = [];
+    editingProjectIndex = null;
+    categoryDefaults = getDefaultCategoryColors();
+    displaySettings = { ...DISPLAY_DEFAULTS };
+    selectedCategoryFilter = ["all"];
+    applyDisplaySettings();
+    populateCategoryFilter();
+
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error("Nu am putut șterge starea Gantt.", error);
+    }
+
+    resetForm();
+    renderAll();
+  }
+
+  function getCsvValue(headers, row, key) {
+    const index = headers.indexOf(key);
+    return index === -1 ? "" : (row[index] || "");
+  }
+
+  function parseCsv(csvText) {
+    const normalized = csvText.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let inQuotes = false;
+
+    for (let index = 0; index < normalized.length; index++) {
+      const char = normalized[index];
+      const nextChar = normalized[index + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          cell += '"';
+          index++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === "," && !inQuotes) {
+        row.push(cell);
+        cell = "";
+      } else if (char === "\n" && !inQuotes) {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = "";
+      } else {
+        cell += char;
+      }
+    }
+
+    if (cell !== "" || row.length > 0) {
+      row.push(cell);
+      rows.push(row);
+    }
+
+    return rows;
+  }
+
+  function escapeCsv(value) {
+    const text = String(value ?? "");
+    if (/[",\n]/.test(text)) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function formatPeriodsForExport(periods) {
+    if (!periods || periods.length === 0) return "";
+    return periods.map(period => `${period.start}-${period.end}`).join("; ");
+  }
+
+  function drawRoundedRect(ctx, x, y, width, height, radius, fillStyle, strokeStyle) {
+    const safeRadius = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + safeRadius, y);
+    ctx.lineTo(x + width - safeRadius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+    ctx.lineTo(x + width, y + height - safeRadius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+    ctx.lineTo(x + safeRadius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+    ctx.lineTo(x, y + safeRadius);
+    ctx.quadraticCurveTo(x, y, x + safeRadius, y);
+    ctx.closePath();
+
+    if (fillStyle) {
+      ctx.fillStyle = fillStyle;
+      ctx.fill();
+    }
+
+    if (strokeStyle) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.stroke();
+    }
+  }
+
+  function buildExportCanvas() {
+    const { years, rows } = buildVisibleTableModel();
+    const nameCol = displaySettings.nameColumnWidth;
+    const yearCol = displaySettings.yearColWidth || 60;
+    const headerHeight = 42;
+    const rowHeight = displaySettings.rowHeight || 42;
+    const width = nameCol + (years.length * yearCol);
+    const height = headerHeight + (rows.length * rowHeight);
+
+    const canvas = document.createElement("canvas");
+    const scale = 2;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.font = "bold 14px system-ui, sans-serif";
+    ctx.textBaseline = "middle";
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, nameCol, headerHeight);
+    ctx.strokeStyle = "#cccccc";
+    ctx.strokeRect(0, 0, nameCol, headerHeight);
+
+    years.forEach((year, index) => {
+      const x = nameCol + (index * yearCol);
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(x, 0, yearCol, headerHeight);
+      ctx.strokeStyle = "#dddddd";
+      ctx.strokeRect(x, 0, yearCol, headerHeight);
+      ctx.fillStyle = "#000000";
+      ctx.fillText(String(year), x + 12, headerHeight / 2);
+    });
+
+    rows.forEach((row, rowIndex) => {
+      const y = headerHeight + (rowIndex * rowHeight);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, y, nameCol, rowHeight);
+      ctx.strokeStyle = "#e6e6e6";
+      ctx.strokeRect(0, y, nameCol, rowHeight);
+
+      const swatchSize = displaySettings.swatchSize || 18;
+      const swatchX = row.isSubtask ? 26 : 14;
+      const textX = row.isSubtask ? (swatchX + swatchSize + 10) : (swatchX + swatchSize + 10);
+      drawRoundedRect(ctx, swatchX, y + 12, swatchSize, swatchSize, swatchSize/2, row.color, "rgba(0,0,0,0.15)");
+
+      ctx.fillStyle = "#111111";
+      ctx.font = `${row.isSubtask ? displaySettings.subtaskFontSize : displaySettings.fontSize}px system-ui, sans-serif`;
+      ctx.fillText(row.label, textX, y + (rowHeight / 2));
+
+      years.forEach((_, yearIndex) => {
+        const x = nameCol + (yearIndex * yearCol);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x, y, yearCol, rowHeight);
+        ctx.strokeStyle = "#eeeeee";
+        ctx.strokeRect(x, y, yearCol, rowHeight);
+      });
+
+      row.periods.forEach(period => {
+        const startIndex = years.indexOf(period.start);
+        const endIndex = years.indexOf(period.end);
+        if (startIndex === -1 || endIndex === -1) return;
+
+        const barX = nameCol + (startIndex * yearCol) + 4;
+        const barWidth = ((endIndex - startIndex + 1) * yearCol) - 8;
+        const barY = y + Math.max(6, (rowHeight - displaySettings.barHeight) / 2);
+        const programColor = displaySettings.programColor || DISPLAY_DEFAULTS.programColor;
+        drawRoundedRect(ctx, barX, barY, barWidth, displaySettings.barHeight, 8, row.isSubtask ? row.color : programColor, "rgba(0,0,0,0.2)");
+      });
+    });
+
+    return canvas;
+  }
+
+  function exportTableJpg() {
+    if (projects.length === 0) {
+      alert("Nu există tabel de salvat.");
+      return;
+    }
+    const canvas = buildExportCanvas();
+
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/jpeg", 0.95);
+    link.download = "gantt-table.jpg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function exportTableXls() {
+    if (projects.length === 0) {
+      alert("Nu există tabel de salvat.");
+      return;
+    }
+
+    const { years, rows } = buildVisibleTableModel();
+    const headerCells = [
+      "<th>Program</th>",
+      "<th>Categorie</th>",
+      ...years.map(year => `<th>${year}</th>`)
+    ].join("");
+
+    let previousProjectIndex = null;
+    const bodyRows = rows.map(row => {
+      const yearCells = years.map(year => {
+        const covered = row.periods.some(period => year >= period.start && year <= period.end);
+        const bg = covered ? row.color : "#ffffff";
+        const text = covered ? "■" : "";
+        return `<td style="background:${bg}; color:${covered ? '#ffffff' : '#000000'}; text-align:center;">${text}</td>`;
+      }).join("");
+
+      const separatorRow = previousProjectIndex !== null && previousProjectIndex !== row.projectIndex
+        ? `<tr><td colspan="${2 + years.length}" style="border:0; height:10px; background:#ffffff;"></td></tr>`
+        : "";
+
+      previousProjectIndex = row.projectIndex;
+
+      const programCell = row.isSubtask
+        ? "<td></td>"
+        : `<td style="font-weight:700; white-space:nowrap;">${escapeHtml(row.label)}</td>`;
+
+      const categoryCell = row.isSubtask
+        ? `<td style="padding-left:8px; white-space:nowrap;">${escapeHtml(row.label)}</td>`
+        : "<td></td>";
+
+      return `${separatorRow}
+        <tr>
+          ${programCell}
+          ${categoryCell}
+          ${yearCells}
+        </tr>`;
+    }).join("\n");
+
+    const htmlTable = `
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+          th, td { border: 1px solid #cfd6df; padding: 6px 8px; }
+          th { background: #eef3f8; font-weight: 700; text-align: center; }
+          td { min-width: 42px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr>${headerCells}</tr>
+          </thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(["\ufeff", htmlTable], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "gantt-table.xls";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function printTable() {
+    window.print();
+  }
+
+  renderAll();
+</script>
+
+</body>
+</html>
