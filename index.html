@@ -130,6 +130,26 @@
     font-size: 13px;
   }
 
+  .subtask-label-input {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    font-weight: 600;
+    width: 160px;
+    box-sizing: border-box;
+    cursor: text;
+  }
+  .subtask-label-input:focus {
+    outline: none;
+    border: 1px dashed #cfcfcf;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border-style: solid;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(31,95,139,0.08);
+    background: #fff;
+  }
+
   .subtask-color {
     display: flex;
     align-items: center;
@@ -895,7 +915,7 @@
       const id = category.id;
       container.innerHTML += `
         <div class="subtask-row" data-cat-id="${id}">
-          <div class="subtask-title">${category.label}</div>
+          <div class="subtask-title"><input id="label_${id}" title="Click pentru a edita" class="subtask-label-input" type="text" value="${escapeHtml(category.label)}" /></div>
           <div class="subtask-color">
             <label class="visually-hidden" for="color_${id}">Culoare ${category.label}</label>
             <input id="color_${id}" type="color" value="${categoryDefaults[id]}" aria-label="Culoare ${category.label}">
@@ -980,12 +1000,19 @@
 
     const projectPeriods = readPeriods("project");
 
+    // read and persist any edited category labels and colors
     const subtasks = {};
-    CATEGORIES.forEach(category => {
+    CATEGORIES.forEach((category, idx) => {
       const id = category.id;
-      categoryDefaults[id] = document.getElementById("color_" + id).value;
+      const labelInput = document.getElementById("label_" + id);
+      if (labelInput) {
+        // update the in-memory category label
+        category.label = String(labelInput.value || id).trim();
+      }
+      const colorVal = document.getElementById("color_" + id).value;
+      categoryDefaults[id] = colorVal;
       subtasks[id] = {
-        color: document.getElementById("color_" + id).value,
+        color: colorVal,
         periods: readPeriods(id)
       };
     });
@@ -1002,6 +1029,9 @@
     } else {
       projects[editingProjectIndex] = projectRecord;
     }
+
+    // persist changed category labels/colors
+    persistState();
 
     persistState();
     resetForm();
@@ -1037,6 +1067,8 @@
 
     CATEGORIES.forEach(category => {
       const subtask = project.subtasks[category.id] || { color: categoryDefaults[category.id], periods: [] };
+      const labelEl = document.getElementById("label_" + category.id);
+      if (labelEl) labelEl.value = category.label;
       document.getElementById("color_" + category.id).value = subtask.color;
       setPeriods(category.id, subtask.periods);
     });
