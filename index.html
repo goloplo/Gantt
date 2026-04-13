@@ -161,6 +161,23 @@
     font-size: 12px;
   }
 
+  .circle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--accent-color);
+    background: #fff;
+    color: var(--accent-color);
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    margin-left: 4px;
+  }
+
   .form-box input[type="text"] {
     width: 100%;
     box-sizing: border-box;
@@ -576,6 +593,13 @@
   <hr>
 
   <!-- SUBTASKS -->
+  <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+    <input id="newCategoryId" type="text" placeholder="id (fără spații)" style="width:140px; padding:6px; border:1px solid var(--border-color); border-radius:8px;" />
+    <input id="newCategoryLabel" type="text" placeholder="Etichetă categorie" style="width:220px; padding:6px; border:1px solid var(--border-color); border-radius:8px;" />
+    <input id="newCategoryColor" type="color" value="#888888" style="width:56px; height:34px;" />
+    <button type="button" onclick="addCategory()">Adaugă categorie</button>
+  </div>
+
   <div id="subtasks_form" class="subtasks-compact"></div>
 </div>
 
@@ -677,6 +701,14 @@
 
   function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
+  }
+
+  function randomColor() {
+    // nice pastel HSL colors
+    const h = Math.floor(Math.random() * 360);
+    const s = 55 + Math.floor(Math.random() * 20); // 55-75%
+    const l = 45 + Math.floor(Math.random() * 10); // 45-55%
+    return `hsl(${h} ${s}% ${l}%)`;
   }
 
   function applyDisplaySettings() {
@@ -862,14 +894,14 @@
     CATEGORIES.forEach(category => {
       const id = category.id;
       container.innerHTML += `
-        <div class="subtask-row">
+        <div class="subtask-row" data-cat-id="${id}">
           <div class="subtask-title">${category.label}</div>
           <div class="subtask-color">
             <label class="visually-hidden" for="color_${id}">Culoare ${category.label}</label>
             <input id="color_${id}" type="color" value="${categoryDefaults[id]}" aria-label="Culoare ${category.label}">
           </div>
           <div id="periods_${id}" class="subtask-periods"></div>
-          <div><button type="button" onclick="addPeriod('${id}')">Adaugă</button></div>
+          <div style="display:flex; gap:6px; align-items:center;"><button type="button" onclick="removeCategory('${id}')">Elimină</button></div>
         </div>
       `;
 
@@ -877,6 +909,8 @@
     });
 
     updateFormActions();
+    const newCatColor = document.getElementById('newCategoryColor');
+    if (newCatColor && (!newCatColor.value || newCatColor.value === '#888888')) newCatColor.value = randomColor();
   }
 
   initForm();
@@ -891,10 +925,51 @@
     div.innerHTML = `
       <input type="number" class="start" placeholder="An start" value="${start}">
       <input type="number" class="end" placeholder="An sfârșit" value="${end}">
-      <button type="button" onclick="this.parentElement.remove()">x</button>
+      <button type="button" class="circle-btn period-remove" aria-label="Elimină perioadă" onclick="this.parentElement.remove()">×</button>
+      <button type="button" class="circle-btn" title="Adaugă perioadă" onclick="addPeriod('${target}')">+</button>
     `;
 
     document.getElementById("periods_" + target).appendChild(div);
+  }
+
+  // Category management: add / remove categories
+  function addCategory() {
+    const idInput = document.getElementById('newCategoryId');
+    const labelInput = document.getElementById('newCategoryLabel');
+    const colorInput = document.getElementById('newCategoryColor');
+
+    const id = String((idInput.value || '').trim()).toLowerCase();
+    const label = String((labelInput.value || '').trim()) || id;
+    const color = colorInput.value || '#888888';
+
+    if (!id || /\s/.test(id)) { alert('ID categorie este obligatoriu și nu trebuie să conțină spații.'); return; }
+    if (CATEGORIES.some(c => c.id === id)) { alert('ID categorie deja existent.'); return; }
+
+    CATEGORIES.push({ id, label, color });
+    categoryDefaults[id] = color;
+    // persist categories via state save
+    persistState();
+    // re-init the form and filters
+    initForm();
+    populateCategoryFilter();
+  }
+
+  function removeCategory(id) {
+    if (!confirm('Eliminați categoria "' + id + '"? Aceasta va elimina datele subtask asociate din proiectele existente.')) return;
+    const idx = CATEGORIES.findIndex(c => c.id === id);
+    if (idx === -1) return;
+    CATEGORIES.splice(idx, 1);
+    delete categoryDefaults[id];
+
+    // Remove subtask data from projects
+    projects.forEach(project => {
+      if (project.subtasks && project.subtasks[id]) delete project.subtasks[id];
+    });
+
+    persistState();
+    initForm();
+    populateCategoryFilter();
+    renderAll();
   }
 
   function saveProject() {
@@ -1249,6 +1324,42 @@
     }
 
     const headers = rows[0].map(cell => cell.trim().toLowerCase());
+    // detect category ids from headers (columns like '<id>_color' or '<id>_periods')
+    const detectedCategoryIds = [];
+    headers.forEach(h => {
+      const m = h.match(/^(.+?)_(color|periods)$/);
+      if (m) {
+        const cid = m[1];
+        // skip project columns
+        if (cid === 'project') return;
+        if (!detectedCategoryIds.includes(cid)) detectedCategoryIds.push(cid);
+      }
+    });
+    // Rebuild CATEGORIES to respect CSV order: detected categories only (creating missing ones).
+    // If CSV contains category columns, replace the current categories with those; otherwise keep existing.
+    if (detectedCategoryIds.length > 0) {
+      const existingById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+      const newCategories = [];
+      detectedCategoryIds.forEach(catId => {
+        if (existingById[catId]) {
+          newCategories.push(existingById[catId]);
+        } else {
+          const friendly = catId.replace(/[-_]/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+          const rand = randomColor();
+          const created = { id: catId, label: friendly, color: rand };
+          newCategories.push(created);
+          categoryDefaults[catId] = rand;
+        }
+      });
+      // replace CATEGORIES in-place with detected ones
+      CATEGORIES.length = 0;
+      newCategories.forEach(c => CATEGORIES.push(c));
+      // remove subtask data for any category no longer present
+      const allowed = new Set(detectedCategoryIds);
+      projects.forEach(project => {
+        Object.keys(project.subtasks || {}).forEach(k => { if (!allowed.has(k)) delete project.subtasks[k]; });
+      });
+    }
     const importedProjects = [];
 
     for (let i = 1; i < rows.length; i++) {
@@ -1290,6 +1401,8 @@
       displaySettings.programColor = projects[0].color || DISPLAY_DEFAULTS.programColor;
       applyDisplaySettings();
     }
+    // persist any dynamically added categories
+    persistState();
     persistState();
     resetForm();
     renderAll();
@@ -1336,7 +1449,8 @@
         projects,
         categoryDefaults,
         selectedCategoryFilter,
-        displaySettings
+        displaySettings,
+        categories: CATEGORIES
       }));
     } catch (error) {
       console.error("Nu am putut salva starea Gantt.", error);
@@ -1356,6 +1470,12 @@
         ...getDefaultCategoryColors(),
         ...(parsed.categoryDefaults || {})
       };
+      // restore categories if saved
+      if (Array.isArray(parsed.categories) && parsed.categories.length > 0) {
+        // replace CATEGORIES in-place
+        CATEGORIES.length = 0;
+        parsed.categories.forEach(c => CATEGORIES.push(c));
+      }
       displaySettings = {
         ...DISPLAY_DEFAULTS,
         ...(parsed.displaySettings || {})
